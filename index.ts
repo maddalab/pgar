@@ -136,30 +136,37 @@ let userData = mustache.render(userDataTemplate, {
 
 const key = new aws.ec2.KeyPair("github-runners", { keyName: "github-runners", publicKey: config.require("ssh-key")})
 
-// create ec2 instances for github runners
-async function create_runners() {
-    const subnetIds = await vpc.privateSubnetIds;
-    let counter = -1
+const launchTemplate = new aws.ec2.LaunchTemplate("ci-cd-runner-template", {
+    description: "Github Actions Runner template",
+    imageId: ami.id,
+    instanceType: "t2.large",
+    keyName: key.keyName,
+    name: "ci-cd-runner-template",
+    tags: {
+        Name: "ci-cd-runner-template",
+    },
+    iamInstanceProfile: {
+        arn: runnerProfile.arn
+    },
+    vpcSecurityGroupIds: [ instanceSecurityGroups.id ],
+    userData: Buffer.from(userData).toString('base64')
+});
 
-    return subnetIds.map(subnet => {
-        counter = counter + 1
-        const instance = `ci-cd-server-${counter}`
-        return new aws.ec2.Instance(instance, {
-            iamInstanceProfile: runnerProfile,
-            instanceType: "t2.large",
-            vpcSecurityGroupIds: [ instanceSecurityGroups.id ], 
-            ami: ami.id,
-            subnetId: subnet,
-            tags: {
-                Name: instance
-            },
-            keyName: key.keyName,
-            userData: userData
-        });
-    })
-}
+// create an ASG for ec2 instances running github runners
+export const runnerAsg = new aws.autoscaling.Group("ci-cd-runner-asg", {
+    name: "ci-cd-runner-asg",
+    desiredCapacity: 2,
+    maxSize: 2,
+    minSize: 1,
+    healthCheckGracePeriod: 300,
+    healthCheckType: "EC2",
+    launchTemplate: {
+        id: launchTemplate.id,
+        version: `$Latest`,
+    },
+    vpcZoneIdentifiers: vpc.privateSubnetIds
+});
 
-aws.ec2.KeyPair
 
 // create jump josts in public subnets that will let us ssh into github runners
 async function create_hosts() {
@@ -183,5 +190,4 @@ async function create_hosts() {
     })
 }
 
-export const runners = create_runners()
 export const hosts = create_hosts()
