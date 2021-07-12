@@ -1,5 +1,6 @@
 encryptionsalt: v1:o/4blXcAvV0=:v1:FAfXKzBOxESktxNU:vGJxYHuWRZvov//s/ZdZST0+p5M+Mg==
 config:
+  aws:region: us-east-1
   p-gar:GITHUB_ACCESS_TOKEN:
     secure: v1:I7IdkR7b9mVXOxnu:Q2GVMCrESFN/q0oFSaDC5vKddGG9cNW+w7anLjKkbRvVpgZ/T3JYtgYWrCDqTPASMQqTd9vrjQ8=
   p-gar:GITHUB_ACTIONS_RUNNER_CONTEXT: https://github.com/maddalab/pulumi-poetry-actions/
