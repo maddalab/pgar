@@ -1,5 +1,8 @@
+#!/bin/bash
+set -e
+
 # install necessary tools
-apt-get install -y curl jq docker-io
+apt install -y curl jq docker.io
 
 # create a user and group for github runners
 addgroup runner
@@ -23,16 +26,6 @@ RUNNER_WORKDIR="_work"
 GITHUB_ACCESS_TOKEN="{{{GITHUB_ACCESS_TOKEN}}}"
 GITHUB_ACTIONS_RUNNER_CONTEXT="{{{GITHUB_ACTIONS_RUNNER_CONTEXT}}}"
 
-if [[ -z "${GITHUB_ACCESS_TOKEN}"]]; then
-  echo 'GITHUB_ACCESS_TOKEN is missing. Quit!'
-  exit 1
-fi
-
-if [[ -z "${GITHUB_ACTIONS_RUNNER_CONTEXT}" ]]; then
-  echo 'GITHUB_ACTIONS_RUNNER_CONTEXT is missing. Quit!'
-  exit 1
-fi
-
 AUTH_HEADER="Authorization: token ${GITHUB_ACCESS_TOKEN}"
 USERNAME=$(cut -d/ -f4 <<< ${GITHUB_ACTIONS_RUNNER_CONTEXT})
 REPOSITORY=$(cut -d/ -f5 <<< ${GITHUB_ACTIONS_RUNNER_CONTEXT})
@@ -49,5 +42,6 @@ RUNNER_TOKEN="$(curl -XPOST -fsSL \
 "${TOKEN_REGISTRATION_URL}" \
 | jq -r '.token')"
 
-./config.sh --url "${GITHUB_ACTIONS_RUNNER_CONTEXT}" --token "${RUNNER_TOKEN}" --name "${RUNNER_NAME}" --work "${RUNNER_WORKDIR}"
-./run.sh
+RUNNER_ALLOW_RUNASROOT=1 ./config.sh --url "${GITHUB_ACTIONS_RUNNER_CONTEXT}" --token "${RUNNER_TOKEN}" --name "${RUNNER_NAME}" --work "${RUNNER_WORKDIR}"
+RUNNER_ALLOW_RUNASROOT=1 ./svc.sh install
+RUNNER_ALLOW_RUNASROOT=1 ./svc.sh start
