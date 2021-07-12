@@ -7,8 +7,8 @@ import * as path from "path";
 
 // Define a new VPC
 const vpc = new awsx.ec2.Vpc("ci-cd", {
-    numberOfAvailabilityZones: 1,
-    numberOfNatGateways: 1,
+    numberOfAvailabilityZones: 2,
+    numberOfNatGateways: 2,
     cidrBlock: "10.0.0.0/26",
     subnets: [
         {type: "private", tags: {Name: "ci-cd-private"}},
