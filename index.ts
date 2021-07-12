@@ -106,9 +106,10 @@ const instanceSecurityGroups = new aws.ec2.SecurityGroup('ci-cd-instance-securit
 // let userDataRaw = fs.readFileSync('./files/userdata.sh')
 // let userData = Buffer.from(userDataRaw).toString('base64')
 
+const key = new aws.ec2.KeyPair("github-runners", { keyName: "github-runners", publicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDbavshc5QISWn8w55vuh/jaNOZObAIzJcvkJdDR4EWMpsuasGRMlW1Mpju3cE7l2P4ZitaoEe8rMLWtHbWVV7c75XeodbIMCvEa9e7Hv7zRh7raY4XHrpiebDmPdHW7HgmhR4wAo5O2OIHBYl82BzaYUJoOelKyZJeN2VNJrmsY+R1vN6+sVwmgZri0FEck1BZw5f0RCm5qNrMLwwjE61xmBiAfLADjzHmKlnbgJe3X13Pt/kE6YHCmshOUCAnyyBksjIn8ChEhhv/qSEqBfHHBoAuqDwJ7aYigpdDTLsuxT2GKc6VbBBECzBBjqytZqViggZCPbe5AiFiWYd7QCuqAMYfL99sr+6fMIAdq8hLulK++rxOa1oc//bBG1rrzbeVqO6MiQwUa3KO2uR9vpUaNZc4ySkixo/kwhk3iKt1UPyaATBCez47PIIcBFcj2ny/BDYgyt/9Sdnf4vJ3H+fgza14WghSEgeqSqiLTN/VarA5Ky0AhKQ9XbRwVoU/ks38cIEmW08t6wvzu1ahFDtD+7gnuNdxroG/xtxQu05mgN8QGigfUM/JnoNQm9OHQToEraq9l74Y0axGjwJFU7x30cDHUGbEanzTl7oDd8Bp4zYVhkWnhWPHQHxvh6wfwh0ppR6CbjJGADItovFkvvTZ4LLoQO55C437iE4+I41MGw== maddalab@gmail.com"})
 
 // create ec2 instances for github runners
-export const runners = async () => {
+async function create_runners() {
     const subnetIds = await vpc.privateSubnetIds;
     let counter = -1
 
@@ -124,13 +125,15 @@ export const runners = async () => {
             tags: {
                 Name: instance
             },
-            keyName: "github-runners"
+            keyName: key.keyName
         });
     })
 }
 
+aws.ec2.KeyPair
+
 // create jump josts in public subnets that will let us ssh into github runners
-export const hosts = async () => {
+async function create_hosts() {
     const subnetIds = await vpc.publicSubnetIds;
     let counter = -1
 
@@ -146,7 +149,10 @@ export const hosts = async () => {
             tags: {
                 Name: instance
             },
-            keyName: "github-runners"
+            keyName: key.keyName
         });
     })
 }
+
+export const runners = create_runners()
+export const hosts = create_hosts()
