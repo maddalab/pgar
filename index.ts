@@ -2,6 +2,8 @@ import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 import * as awsx from "@pulumi/awsx";
 import * as fs from 'fs';
+import * as mustache from "mustache";
+import * as path from "path";
 
 // Define a new VPC
 const vpc = new awsx.ec2.Vpc("ci-cd", {
@@ -18,14 +20,20 @@ const vpc = new awsx.ec2.Vpc("ci-cd", {
 });
 
 // create an IAM role for github runners (using ec2 service principal) 
-const iamRole = new aws.iam.Role("ci-cd-role", {
+const cicdRole = new aws.iam.Role("ci-cd-role", {
+    assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
+        Service: "ec2.amazonaws.com",
+    }),
+})
+
+const jumpRole = new aws.iam.Role("ci-cd-jump-role", {
     assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
         Service: "ec2.amazonaws.com",
     }),
 })
 
 // policies provided to the github runner
-const managedPolicyArns: [string, string][] = [
+const runnerPolicies: [string, string][] = [
     ['AmazonEC2FullAccess', 'arn:aws:iam::aws:policy/AmazonEC2FullAccess'],
     ['AmazonSSMManagedInstanceCore', 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'],
     ['AmazonEC2ContainerRegistryPowerUser', 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser'],
@@ -39,15 +47,31 @@ const managedPolicyArns: [string, string][] = [
   Loop through the managed policies and attach
   them to the defined IAM role
 */
-for (const policy of managedPolicyArns) {
+for (const policy of runnerPolicies) {
     // Create RolePolicyAttachment without returning it.
     const rpa = new aws.iam.RolePolicyAttachment(`ci-cd-${policy[0]}`,
-        { policyArn: policy[1], role: iamRole.id }, { parent: iamRole }
+        { policyArn: policy[1], role: cicdRole.id }, { parent: cicdRole }
     );
 }
 
-const instanceProfile = new aws.iam.InstanceProfile('ci-cd-instance', {
-    role: iamRole.name
+const runnerProfile = new aws.iam.InstanceProfile('ci-cd-runner', {
+    role: cicdRole.name
+})
+
+const jumpHostPolicies: [string, string][] = [
+    ['AmazonEC2FullAccess', 'arn:aws:iam::aws:policy/AmazonEC2FullAccess'],
+    ['AmazonS3FullAccess', 'arn:aws:iam::aws:policy/AmazonS3FullAccess']
+]
+
+for (const policy of jumpHostPolicies) {
+    // Create RolePolicyAttachment without returning it.
+    const rpa = new aws.iam.RolePolicyAttachment(`ci-cd-jump-${policy[0]}`,
+        { policyArn: policy[1], role: jumpRole.id }, { parent: jumpRole }
+    );
+}
+
+const jumpHostProfile = new aws.iam.InstanceProfile('ci-cd-jump-host', {
+    role: jumpRole.name
 })
 
 /*
@@ -103,8 +127,13 @@ const instanceSecurityGroups = new aws.ec2.SecurityGroup('ci-cd-instance-securit
   This defines the userdata for the instances on startup.
   We read the file async, and then convert to a Base64 string because it's clean in the metadata
 */
-// let userDataRaw = fs.readFileSync('./files/userdata.sh')
-// let userData = Buffer.from(userDataRaw).toString('base64')
+const config = new pulumi.Config();
+const userDataTemplate = fs.readFileSync(path.join(__dirname, "user_data.sh")).toString();
+let userData = mustache.render(userDataTemplate, {
+    GITHUB_ACCESS_TOKEN: config.require("GITHUB_ACCESS_TOKEN"),
+    GITHUB_ACTIONS_RUNNER_CONTEXT: config.require("GITHUB_ACTIONS_RUNNER_CONTEXT")
+})
+//Buffer.from(fs.readFileSync("user_data.sh")).toString('base64')
 
 const key = new aws.ec2.KeyPair("github-runners", { keyName: "github-runners", publicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDbavshc5QISWn8w55vuh/jaNOZObAIzJcvkJdDR4EWMpsuasGRMlW1Mpju3cE7l2P4ZitaoEe8rMLWtHbWVV7c75XeodbIMCvEa9e7Hv7zRh7raY4XHrpiebDmPdHW7HgmhR4wAo5O2OIHBYl82BzaYUJoOelKyZJeN2VNJrmsY+R1vN6+sVwmgZri0FEck1BZw5f0RCm5qNrMLwwjE61xmBiAfLADjzHmKlnbgJe3X13Pt/kE6YHCmshOUCAnyyBksjIn8ChEhhv/qSEqBfHHBoAuqDwJ7aYigpdDTLsuxT2GKc6VbBBECzBBjqytZqViggZCPbe5AiFiWYd7QCuqAMYfL99sr+6fMIAdq8hLulK++rxOa1oc//bBG1rrzbeVqO6MiQwUa3KO2uR9vpUaNZc4ySkixo/kwhk3iKt1UPyaATBCez47PIIcBFcj2ny/BDYgyt/9Sdnf4vJ3H+fgza14WghSEgeqSqiLTN/VarA5Ky0AhKQ9XbRwVoU/ks38cIEmW08t6wvzu1ahFDtD+7gnuNdxroG/xtxQu05mgN8QGigfUM/JnoNQm9OHQToEraq9l74Y0axGjwJFU7x30cDHUGbEanzTl7oDd8Bp4zYVhkWnhWPHQHxvh6wfwh0ppR6CbjJGADItovFkvvTZ4LLoQO55C437iE4+I41MGw== maddalab@gmail.com"})
 
@@ -117,7 +146,7 @@ async function create_runners() {
         counter = counter + 1
         const instance = `ci-cd-server-${counter}`
         return new aws.ec2.Instance(instance, {
-            iamInstanceProfile: instanceProfile,
+            iamInstanceProfile: runnerProfile,
             instanceType: "t2.large",
             vpcSecurityGroupIds: [ instanceSecurityGroups.id ], 
             ami: ami.id,
@@ -125,7 +154,8 @@ async function create_runners() {
             tags: {
                 Name: instance
             },
-            keyName: key.keyName
+            keyName: key.keyName,
+            userData: userData
         });
     })
 }
@@ -141,7 +171,7 @@ async function create_hosts() {
         counter = counter + 1
         const instance = `ci-cd-ssh-hosts-${counter}`
         return new aws.ec2.Instance(instance, {
-            iamInstanceProfile: instanceProfile,
+            iamInstanceProfile: jumpHostProfile,
             instanceType: "t2.large",
             vpcSecurityGroupIds: [ instanceSecurityGroups.id ], 
             ami: ami.id,
