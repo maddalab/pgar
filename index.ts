@@ -133,9 +133,8 @@ let userData = mustache.render(userDataTemplate, {
     GITHUB_ACCESS_TOKEN: config.require("GITHUB_ACCESS_TOKEN"),
     GITHUB_ACTIONS_RUNNER_CONTEXT: config.require("GITHUB_ACTIONS_RUNNER_CONTEXT")
 })
-//Buffer.from(fs.readFileSync("user_data.sh")).toString('base64')
 
-const key = new aws.ec2.KeyPair("github-runners", { keyName: "github-runners", publicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDbavshc5QISWn8w55vuh/jaNOZObAIzJcvkJdDR4EWMpsuasGRMlW1Mpju3cE7l2P4ZitaoEe8rMLWtHbWVV7c75XeodbIMCvEa9e7Hv7zRh7raY4XHrpiebDmPdHW7HgmhR4wAo5O2OIHBYl82BzaYUJoOelKyZJeN2VNJrmsY+R1vN6+sVwmgZri0FEck1BZw5f0RCm5qNrMLwwjE61xmBiAfLADjzHmKlnbgJe3X13Pt/kE6YHCmshOUCAnyyBksjIn8ChEhhv/qSEqBfHHBoAuqDwJ7aYigpdDTLsuxT2GKc6VbBBECzBBjqytZqViggZCPbe5AiFiWYd7QCuqAMYfL99sr+6fMIAdq8hLulK++rxOa1oc//bBG1rrzbeVqO6MiQwUa3KO2uR9vpUaNZc4ySkixo/kwhk3iKt1UPyaATBCez47PIIcBFcj2ny/BDYgyt/9Sdnf4vJ3H+fgza14WghSEgeqSqiLTN/VarA5Ky0AhKQ9XbRwVoU/ks38cIEmW08t6wvzu1ahFDtD+7gnuNdxroG/xtxQu05mgN8QGigfUM/JnoNQm9OHQToEraq9l74Y0axGjwJFU7x30cDHUGbEanzTl7oDd8Bp4zYVhkWnhWPHQHxvh6wfwh0ppR6CbjJGADItovFkvvTZ4LLoQO55C437iE4+I41MGw== maddalab@gmail.com"})
+const key = new aws.ec2.KeyPair("github-runners", { keyName: "github-runners", publicKey: config.require("ssh-key")})
 
 // create ec2 instances for github runners
 async function create_runners() {
