@@ -17,12 +17,6 @@ const vpc = new awsx.ec2.Vpc("ci-cd", {
     }
 });
 
-const ssmRole = new aws.iam.Role("ssmRole", {
-    assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal(
-      aws.iam.Principals.SsmPrincipal,
-    ),
-  });
-
 // create an IAM role for github runners (using ec2 service principal) 
 const iamRole = new aws.iam.Role("ci-cd-role", {
     assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
@@ -112,7 +106,9 @@ const instanceSecurityGroups = new aws.ec2.SecurityGroup('ci-cd-instance-securit
 // let userDataRaw = fs.readFileSync('./files/userdata.sh')
 // let userData = Buffer.from(userDataRaw).toString('base64')
 
-export = async () => {
+
+// create ec2 instances for github runners
+export const runners = async () => {
     const subnetIds = await vpc.privateSubnetIds;
     let counter = -1
 
@@ -127,7 +123,30 @@ export = async () => {
             subnetId: subnet,
             tags: {
                 Name: instance
-            }
+            },
+            keyName: "github-runners"
+        });
+    })
+}
+
+// create jump josts in public subnets that will let us ssh into github runners
+export const hosts = async () => {
+    const subnetIds = await vpc.publicSubnetIds;
+    let counter = -1
+
+    return subnetIds.map(subnet => {
+        counter = counter + 1
+        const instance = `ci-cd-ssh-hosts-${counter}`
+        return new aws.ec2.Instance(instance, {
+            iamInstanceProfile: instanceProfile,
+            instanceType: "t2.large",
+            vpcSecurityGroupIds: [ instanceSecurityGroups.id ], 
+            ami: ami.id,
+            subnetId: subnet,
+            tags: {
+                Name: instance
+            },
+            keyName: "github-runners"
         });
     })
 }
