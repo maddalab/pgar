@@ -1,0 +1,3 @@
+name: p-gar
+runtime: nodejs
+description: Pulumi Github Actions Runners
