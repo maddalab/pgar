@@ -43,6 +43,8 @@ pulumi destroy
 
 # Configurations
 
+These are preconfigured for the stack `accrue-money/p-gar/ci-cd` do this only if you are launching a new stack.
+
 Configure pulumi with values for `aws:region`, `GITHUB_ACCESS_TOKEN`, `GITHUB_ACTIONS_RUNNER_CONTEXT` `keyName`.
 
 `GITHUB_ACCESS_TOKEN` is PAT token save it to config as a secret
