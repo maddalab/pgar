@@ -152,13 +152,17 @@ let userData = mustache.render(userDataTemplate, {
     GITHUB_ACTIONS_RUNNER_CONTEXT: config.require("GITHUB_ACTIONS_RUNNER_CONTEXT")
 })
 
-const key = new aws.ec2.KeyPair("github-runners", { keyName: "github-runners", publicKey: config.require("ssh-key")})
+let keyName: pulumi.Input<string> | undefined = config.get("keyName");
+if (!keyName) {
+    const key = new aws.ec2.KeyPair("github-runners", { keyName: "github-runners", publicKey: config.require("ssh-key")})
+    keyName = key.keyName;
+}
 
 const launchTemplate = new aws.ec2.LaunchTemplate("ci-cd-runner-template", {
     description: "Github Actions Runner template",
     imageId: ami.id,
     instanceType: "t2.large",
-    keyName: key.keyName,
+    keyName: keyName,
     name: "ci-cd-runner-template",
     tags: {
         Name: "ci-cd-runner-template",
@@ -218,7 +222,7 @@ async function create_hosts() {
             tags: {
                 Name: instance
             },
-            keyName: key.keyName
+            keyName: keyName
         });
     })
 }
