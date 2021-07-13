@@ -154,7 +154,7 @@ let userData = mustache.render(userDataTemplate, {
 
 let keyName: pulumi.Input<string> | undefined = config.get("keyName");
 if (!keyName) {
-    const key = new aws.ec2.KeyPair("github-runners", { keyName: "github-runners", publicKey: config.require("ssh-key")})
+    const key = new aws.ec2.KeyPair("ci-cd", { keyName: "ci-cd", publicKey: config.require("ssh-key")})
     keyName = key.keyName;
 }
 
