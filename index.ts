@@ -40,7 +40,8 @@ const runnerPolicies: [string, string][] = [
     ['AutoScalingFullAccess', 'arn:aws:iam::aws:policy/AutoScalingFullAccess'],
     ['AmazonS3FullAccess', 'arn:aws:iam::aws:policy/AmazonS3FullAccess'],
     ['AmazonECSTaskExecutionRolePolicy', 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'],
-    ['CloudWatchFullAccess', 'arn:aws:iam::aws:policy/CloudWatchFullAccess']
+    ['CloudWatchFullAccess', 'arn:aws:iam::aws:policy/CloudWatchFullAccess'],
+    ['AmazonSNSFullAccess', 'arn:aws:iam::aws:policy/AmazonSNSFullAccess']
 ]
 
 /*
@@ -60,7 +61,7 @@ const runnerProfile = new aws.iam.InstanceProfile('ci-cd-runner', {
 
 const bastionHostPolicies: [string, string][] = [
     ['AmazonEC2FullAccess', 'arn:aws:iam::aws:policy/AmazonEC2FullAccess'],
-    ['AmazonS3FullAccess', 'arn:aws:iam::aws:policy/AmazonS3FullAccess']
+    ['AmazonS3FullAccess', 'arn:aws:iam::aws:policy/AmazonS3FullAccess'],
 ]
 
 for (const policy of bastionHostPolicies) {
@@ -73,6 +74,23 @@ for (const policy of bastionHostPolicies) {
 const bastionHostProfile = new aws.iam.InstanceProfile('ci-cd-bastion-host', {
     role: bastionRole.name
 })
+
+const lifecycleRole = new aws.iam.Role("ci-cd-lifecycle-role", {
+    assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
+        Service: "autoscaling.amazonaws.com",
+    }),
+})
+
+const lifecyclePolicies: [string, string][] = [
+    ['AutoScalingNotificationAccessRole', 'arn:aws:iam::aws:policy/service-role/AutoScalingNotificationAccessRole'],
+]
+
+for (const policy of lifecyclePolicies) {
+    // Create RolePolicyAttachment without returning it.
+    const rpa = new aws.iam.RolePolicyAttachment(`ci-cd-lifecycle-${policy[0]}`,
+        { policyArn: policy[1], role: lifecycleRole.id }, { parent: lifecycleRole }
+    );
+}
 
 /*
   This grabs the AMI asynchronously so we can use it to pass to the launchtemplate etc
@@ -173,11 +191,12 @@ export const runnerAsg = new aws.autoscaling.Group("ci-cd-runner-asg", {
         name: "asg-events-hook",
         defaultResult: "CONTINUE",
         lifecycleTransition: "autoscaling:EC2_INSTANCE_TERMINATING",
-        notificationTargetArn: asgEventsTopic.arn
+        notificationTargetArn: asgEventsTopic.arn,
+        roleArn: lifecycleRole.arn
     }]
 });
 
-asgEventsTopic.onEvent("processScaleIn", async ev =>{
+const tvs = asgEventsTopic.onEvent("ci-cd-scale-in", async ev =>{
     console.log("Processing " + ev);
 })
 
