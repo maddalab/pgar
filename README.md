@@ -25,7 +25,7 @@ pulumi destroy
 
 # Configurations
 
-Configure pulumi with values for `aws:region`, `GITHUB_ACCESS_TOKEN`, `GITHUB_ACTIONS_RUNNER_CONTEXT` `ssh-key`.
+Configure pulumi with values for `aws:region`, `GITHUB_ACCESS_TOKEN`, `GITHUB_ACTIONS_RUNNER_CONTEXT` `keyName`.
 
 `GITHUB_ACCESS_TOKEN` is PAT token save it to config as a secret
 
@@ -33,7 +33,7 @@ Configure pulumi with values for `aws:region`, `GITHUB_ACCESS_TOKEN`, `GITHUB_AC
 pulumi config set --secret GITHUB_ACCESS_TOKEN XXXX
 ```
 
-`GITHUB_ACTIONS_RUNNER_CONTEXT` can be specified in two formats. One for user/repository for instance `https://github.com/maddalab/pulumi-poetry-actions/` or alternatively for organizations for instance `https://api.github.com/orgs/foobarorg/actions/runners/registration-token`
+`GITHUB_ACTIONS_RUNNER_CONTEXT` can be specified in two formats. One for user/repository for instance `https://github.com/maddalab/pulumi-poetry-actions/` or alternatively for organizations for instance `https://api.github.com/orgs/foobarorg/dashboard`
 
 ```
 pulumi config set GITHUB_ACTIONS_RUNNER_CONTEXT https://github.com/maddalab/pulumi-poetry-actions/
@@ -45,7 +45,7 @@ The intent of this repository is to both develop a pulumi solution for `Github R
 
 ```
 # if you have multiple AWS profiles in your `credentials` file.
-export AWS_PROFILE=personal
-pulumi login s3://pgar-infr
+export AWS_PROFILE=<>
+pulumi login
 pulumi up
 ```
