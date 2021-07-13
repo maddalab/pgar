@@ -1,19 +1,33 @@
 # Pulumi Github Action Runner
 Pulumi IaC for running Github Runners on AWS.
 
-## To set up Github Action runners 
+## Getting Started
+
+### Log into Pulumi service
+```
+pulumi logic
+```
+
+### Select the organization and stack
+```
+pulumi stack select accrue-money/p-gar/ci-cd
+```
+
+_Make sure you are invited to the organization_
+
+### To set up Github Action runners 
 
 ```
 pulumi up
 ```
 
-## To destroy Github action runners
+### To destroy Github action runners
 
 ```
 pulumi destroy
 ```
 
-## EC2 implementation
+## Implementation
 
 * Creates a VPC in 2 AZs
 * Each AZ has a private and public subnet
@@ -21,6 +35,10 @@ pulumi destroy
 * Each public subnet is configured with a host for use with SSH
 * NAT gateway is created in private subnet to route traffic from `Github Runner`
 * Internet gateway is created in public subnet to route traffic to the internet
+* An autoscaling group is utilized to ensure that there are at least 2 runners at any time.
+* A lifecycle hook is associated with the instance in the auto scaling group
+* A lambda is invoked to deregister / remove the runner when the EC2 instance in the auto scaling group is terminated (**IN-PROGRESS**)
+* User Data script is utilized to register EC2 instance as a runner.
 
 
 # Configurations
@@ -33,11 +51,24 @@ Configure pulumi with values for `aws:region`, `GITHUB_ACCESS_TOKEN`, `GITHUB_AC
 pulumi config set --secret GITHUB_ACCESS_TOKEN XXXX
 ```
 
-`GITHUB_ACTIONS_RUNNER_CONTEXT` can be specified in two formats. One for user/repository for instance `https://github.com/maddalab/pulumi-poetry-actions/` or alternatively for organizations for instance `https://api.github.com/orgs/foobarorg/dashboard`
+`GITHUB_ACTIONS_RUNNER_CONTEXT` can be specified in two formats. One for user/repository for instance `https://github.com/maddalab/pulumi-poetry-actions/` or alternatively for organizations for instance `https://github.com/accrue-money`
+
+Github runners for a single repository
 
 ```
 pulumi config set GITHUB_ACTIONS_RUNNER_CONTEXT https://github.com/maddalab/pulumi-poetry-actions/
 ```
+
+Github Runners for entire organization
+
+```
+pulumi config set GITHUB_ACTIONS_RUNNER_CONTEXT https://github.com/accrue-money
+```
+
+# TODO
+
+* Currently this utilized a PAT (_personal account token associated with @maddalab's account_) Replace it with a Organizational app token.
+* Complete lambda implementation to handle lifecycle of EC2 instance,
 
 # How to use
 
