@@ -197,7 +197,7 @@ export const runnerAsg = new aws.autoscaling.Group("ci-cd-runner-asg", {
 });
 
 const tvs = asgEventsTopic.onEvent("ci-cd-scale-in", async ev =>{
-    console.log("Processing " + ev);
+    console.log("Processing " + JSON.stringify(ev));
 })
 
 
