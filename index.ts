@@ -26,7 +26,7 @@ const cicdRole = new aws.iam.Role("ci-cd-role", {
     }),
 })
 
-const jumpRole = new aws.iam.Role("ci-cd-jump-role", {
+const bastionRole = new aws.iam.Role("ci-cd-bastion-role", {
     assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
         Service: "ec2.amazonaws.com",
     }),
@@ -58,20 +58,20 @@ const runnerProfile = new aws.iam.InstanceProfile('ci-cd-runner', {
     role: cicdRole.name
 })
 
-const jumpHostPolicies: [string, string][] = [
+const bastionHostPolicies: [string, string][] = [
     ['AmazonEC2FullAccess', 'arn:aws:iam::aws:policy/AmazonEC2FullAccess'],
     ['AmazonS3FullAccess', 'arn:aws:iam::aws:policy/AmazonS3FullAccess']
 ]
 
-for (const policy of jumpHostPolicies) {
+for (const policy of bastionHostPolicies) {
     // Create RolePolicyAttachment without returning it.
-    const rpa = new aws.iam.RolePolicyAttachment(`ci-cd-jump-${policy[0]}`,
-        { policyArn: policy[1], role: jumpRole.id }, { parent: jumpRole }
+    const rpa = new aws.iam.RolePolicyAttachment(`ci-cd-bastion-${policy[0]}`,
+        { policyArn: policy[1], role: bastionRole.id }, { parent: bastionRole }
     );
 }
 
-const jumpHostProfile = new aws.iam.InstanceProfile('ci-cd-jump-host', {
-    role: jumpRole.name
+const bastionHostProfile = new aws.iam.InstanceProfile('ci-cd-bastion-host', {
+    role: bastionRole.name
 })
 
 /*
@@ -168,7 +168,7 @@ export const runnerAsg = new aws.autoscaling.Group("ci-cd-runner-asg", {
 });
 
 
-// create jump josts in public subnets that will let us ssh into github runners
+// create bastion josts in public subnets that will let us ssh into github runners
 async function create_hosts() {
     const subnetIds = await vpc.publicSubnetIds;
     let counter = -1
@@ -177,7 +177,7 @@ async function create_hosts() {
         counter = counter + 1
         const instance = `ci-cd-ssh-hosts-${counter}`
         return new aws.ec2.Instance(instance, {
-            iamInstanceProfile: jumpHostProfile,
+            iamInstanceProfile: bastionHostProfile,
             instanceType: "t2.large",
             vpcSecurityGroupIds: [ instanceSecurityGroups.id ], 
             ami: ami.id,
