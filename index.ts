@@ -152,7 +152,11 @@ const launchTemplate = new aws.ec2.LaunchTemplate("ci-cd-runner-template", {
     userData: Buffer.from(userData).toString('base64')
 });
 
-// create an ASG for ec2 instances running github runners
+// create a sns topic to receive ASG lifecycle events
+const asgEventsTopic = new aws.sns.Topic("asg-events-topic")
+
+// create an ASG for ec2 instances running github runners, terminating events
+// are posted to a SNS Q with topic asg-events-topic
 export const runnerAsg = new aws.autoscaling.Group("ci-cd-runner-asg", {
     name: "ci-cd-runner-asg",
     desiredCapacity: 2,
@@ -164,8 +168,18 @@ export const runnerAsg = new aws.autoscaling.Group("ci-cd-runner-asg", {
         id: launchTemplate.id,
         version: `$Latest`,
     },
-    vpcZoneIdentifiers: vpc.privateSubnetIds
+    vpcZoneIdentifiers: vpc.privateSubnetIds,
+    initialLifecycleHooks: [{
+        name: "asg-events-hook",
+        defaultResult: "CONTINUE",
+        lifecycleTransition: "autoscaling:EC2_INSTANCE_TERMINATING",
+        notificationTargetArn: asgEventsTopic.arn
+    }]
 });
+
+asgEventsTopic.onEvent("processScaleIn", async ev =>{
+    console.log("Processing " + ev);
+})
 
 
 // create bastion josts in public subnets that will let us ssh into github runners
