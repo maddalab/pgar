@@ -1,0 +1,8 @@
+encryptionsalt: v1:o/4blXcAvV0=:v1:FAfXKzBOxESktxNU:vGJxYHuWRZvov//s/ZdZST0+p5M+Mg==
+config:
+  aws:region: us-east-1
+  p-gar:GITHUB_ACCESS_TOKEN:
+    secure: v1:I7IdkR7b9mVXOxnu:Q2GVMCrESFN/q0oFSaDC5vKddGG9cNW+w7anLjKkbRvVpgZ/T3JYtgYWrCDqTPASMQqTd9vrjQ8=
+  p-gar:GITHUB_ACTIONS_RUNNER_CONTEXT: https://github.com/maddalab/pulumi-poetry-actions/
+  p-gar:ssh-key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDbavshc5QISWn8w55vuh/jaNOZObAIzJcvkJdDR4EWMpsuasGRMlW1Mpju3cE7l2P4ZitaoEe8rMLWtHbWVV7c75XeodbIMCvEa9e7Hv7zRh7raY4XHrpiebDmPdHW7HgmhR4wAo5O2OIHBYl82BzaYUJoOelKyZJeN2VNJrmsY+R1vN6+sVwmgZri0FEck1BZw5f0RCm5qNrMLwwjE61xmBiAfLADjzHmKlnbgJe3X13Pt/kE6YHCmshOUCAnyyBksjIn8ChEhhv/qSEqBfHHBoAuqDwJ7aYigpdDTLsuxT2GKc6VbBBECzBBjqytZqViggZCPbe5AiFiWYd7QCuqAMYfL99sr+6fMIAdq8hLulK++rxOa1oc//bBG1rrzbeVqO6MiQwUa3KO2uR9vpUaNZc4ySkixo/kwhk3iKt1UPyaATBCez47PIIcBFcj2ny/BDYgyt/9Sdnf4vJ3H+fgza14WghSEgeqSqiLTN/VarA5Ky0AhKQ9XbRwVoU/ks38cIEmW08t6wvzu1ahFDtD+7gnuNdxroG/xtxQu05mgN8QGigfUM/JnoNQm9OHQToEraq9l74Y0axGjwJFU7x30cDHUGbEanzTl7oDd8Bp4zYVhkWnhWPHQHxvh6wfwh0ppR6CbjJGADItovFkvvTZ4LLoQO55C437iE4+I41MGw==
+    maddalab@gmail.com
