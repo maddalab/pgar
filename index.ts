@@ -34,14 +34,7 @@ const bastionRole = new aws.iam.Role("ci-cd-bastion-role", {
 
 // policies provided to the github runner
 const runnerPolicies: [string, string][] = [
-    ['AmazonEC2FullAccess', 'arn:aws:iam::aws:policy/AmazonEC2FullAccess'],
-    ['AmazonSSMManagedInstanceCore', 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'],
-    ['AmazonEC2ContainerRegistryPowerUser', 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser'],
-    ['AutoScalingFullAccess', 'arn:aws:iam::aws:policy/AutoScalingFullAccess'],
-    ['AmazonS3FullAccess', 'arn:aws:iam::aws:policy/AmazonS3FullAccess'],
-    ['AmazonECSTaskExecutionRolePolicy', 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'],
-    ['CloudWatchFullAccess', 'arn:aws:iam::aws:policy/CloudWatchFullAccess'],
-    ['AmazonSNSFullAccess', 'arn:aws:iam::aws:policy/AmazonSNSFullAccess']
+    ['AdministratorAccess', 'arn:aws:iam::aws:policy/AdministratorAccess']
 ]
 
 /*
@@ -60,8 +53,7 @@ const runnerProfile = new aws.iam.InstanceProfile('ci-cd-runner', {
 })
 
 const bastionHostPolicies: [string, string][] = [
-    ['AmazonEC2FullAccess', 'arn:aws:iam::aws:policy/AmazonEC2FullAccess'],
-    ['AmazonS3FullAccess', 'arn:aws:iam::aws:policy/AmazonS3FullAccess'],
+    ['ReadOnlyAccess', 'arn:aws:iam::aws:policy/ReadOnlyAccess']
 ]
 
 for (const policy of bastionHostPolicies) {

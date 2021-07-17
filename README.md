@@ -1,6 +1,8 @@
 # Pulumi Github Action Runner
 Pulumi IaC for running Github Runners on AWS.
 
+NOTE: This code needs to be bootstrapped from a developer machine with privileges *once*
+
 ## Getting Started
 
 ### Log into Pulumi service
