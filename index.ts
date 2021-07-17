@@ -179,7 +179,7 @@ const asgEventsTopic = new aws.sns.Topic("asg-events-topic")
 
 // create an ASG for ec2 instances running github runners, terminating events
 // are posted to a SNS Q with topic asg-events-topic
-export const runnerAsg = new aws.autoscaling.Group("ci-cd-runner-asg", {
+const runnerAsg = new aws.autoscaling.Group("ci-cd-runner-asg", {
     name: "ci-cd-runner-asg",
     desiredCapacity: 2,
     maxSize: 2,
@@ -205,26 +205,18 @@ const tvs = asgEventsTopic.onEvent("ci-cd-scale-in", async ev =>{
 })
 
 
-// create bastion josts in public subnets that will let us ssh into github runners
-async function create_hosts() {
-    const subnetIds = await vpc.publicSubnetIds;
-    let counter = -1
-
-    return subnetIds.map(subnet => {
-        counter = counter + 1
-        const instance = `ci-cd-ssh-hosts-${counter}`
-        return new aws.ec2.Instance(instance, {
-            iamInstanceProfile: bastionHostProfile,
-            instanceType: "t2.large",
-            vpcSecurityGroupIds: [ instanceSecurityGroups.id ], 
-            ami: ami.id,
-            subnetId: subnet,
-            tags: {
-                Name: instance
-            },
-            keyName: keyName
-        });
+// create a bastion hosts in the public subnet
+export const bastionHost = vpc.publicSubnetIds.then(psnids => {
+    const firstSubnetId = psnids[0]
+    return new aws.ec2.Instance("ci-cd-ssh-host", {
+        iamInstanceProfile: bastionHostProfile,
+        instanceType: "t2.large",
+        vpcSecurityGroupIds: [ instanceSecurityGroups.id ], 
+        ami: ami.id,
+        subnetId: firstSubnetId,
+        tags: {
+            Name: "ci-cd-ssh-host"
+        },
+        keyName: keyName
     })
-}
-
-export const hosts = create_hosts()
+})
