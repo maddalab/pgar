@@ -61,3 +61,37 @@ chown -R runner:runner /home/runner
 chmod -R 0777 /home/runner
 RUNNER_ALLOW_RUNASROOT=1 ./svc.sh install
 RUNNER_ALLOW_RUNASROOT=1 ./svc.sh start
+
+# create shell command to remove runner when instance terminates
+cat > /home/runner/instance_terminating.sh << EOF
+#!/bin/bash
+set -e
+
+# obtain a remove token from github
+GITHUB_ACCESS_TOKEN="{{{GITHUB_ACCESS_TOKEN}}}"
+GITHUB_ACTIONS_RUNNER_CONTEXT="{{{GITHUB_ACTIONS_RUNNER_CONTEXT}}}"
+
+AUTH_HEADER="Authorization: token ${GITHUB_ACCESS_TOKEN}"
+USERNAME=$(cut -d/ -f4 <<< ${GITHUB_ACTIONS_RUNNER_CONTEXT})
+REPOSITORY=$(cut -d/ -f5 <<< ${GITHUB_ACTIONS_RUNNER_CONTEXT})
+
+if [[ -z "${REPOSITORY}" ]]; then 
+REMOVE_TOKEN_URL="https://api.github.com/orgs/${USERNAME}/actions/runners/remove-token"
+else
+REMOVE_TOKEN_URL="https://api.github.com/repos/${USERNAME}/${REPOSITORY}/actions/runners/remove-token"
+fi
+
+REMOVE_TOKEN="$(curl -XPOST -fsSL \
+-H "Accept: application/vnd.github.v3+json" \
+-H "${AUTH_HEADER}" \
+"${REMOVE_TOKEN_URL}" \
+| jq -r '.token')"
+
+# uninstall the service
+RUNNER_ALLOW_RUNASROOT=1 ./svc.sh uninstall
+
+# remove the runner
+RUNNER_ALLOW_RUNASROOT=1 ./config.sh remove ${REMOVE_TOKEN}
+EOF
+
+chmod +x /home/runner/instance_terminating.sh

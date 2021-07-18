@@ -24,18 +24,18 @@ const cicdRole = new aws.iam.Role("ci-cd-role", {
     assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
         Service: "ec2.amazonaws.com",
     }),
-})
+});
 
 const bastionRole = new aws.iam.Role("ci-cd-bastion-role", {
     assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
         Service: "ec2.amazonaws.com",
     }),
-})
+});
 
 // policies provided to the github runner
 const runnerPolicies: [string, string][] = [
     ['AdministratorAccess', 'arn:aws:iam::aws:policy/AdministratorAccess']
-]
+];
 
 /*
   Loop through the managed policies and attach
@@ -50,11 +50,11 @@ for (const policy of runnerPolicies) {
 
 const runnerProfile = new aws.iam.InstanceProfile('ci-cd-runner', {
     role: cicdRole.name
-})
+});
 
 const bastionHostPolicies: [string, string][] = [
     ['ReadOnlyAccess', 'arn:aws:iam::aws:policy/ReadOnlyAccess']
-]
+];
 
 for (const policy of bastionHostPolicies) {
     // Create RolePolicyAttachment without returning it.
@@ -65,17 +65,17 @@ for (const policy of bastionHostPolicies) {
 
 const bastionHostProfile = new aws.iam.InstanceProfile('ci-cd-bastion-host', {
     role: bastionRole.name
-})
+});
 
 const lifecycleRole = new aws.iam.Role("ci-cd-lifecycle-role", {
     assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
         Service: "autoscaling.amazonaws.com",
     }),
-})
+});
 
 const lifecyclePolicies: [string, string][] = [
     ['AutoScalingNotificationAccessRole', 'arn:aws:iam::aws:policy/service-role/AutoScalingNotificationAccessRole'],
-]
+];
 
 for (const policy of lifecyclePolicies) {
     // Create RolePolicyAttachment without returning it.
@@ -94,7 +94,7 @@ const ami = pulumi.output(aws.ec2.getAmi({
     ],
     owners: ["099720109477"],
     mostRecent: true
-}))
+}));
 
 /*
   Define a security group for the ec2 instances.
@@ -131,7 +131,7 @@ const instanceSecurityGroups = new aws.ec2.SecurityGroup('ci-cd-instance-securit
         toPort: 0,
         cidrBlocks: ['0.0.0.0/0'],
     }]
-})
+});
 
 /*
   This defines the userdata for the instances on startup.
@@ -142,7 +142,7 @@ const userDataTemplate = fs.readFileSync(path.join(__dirname, "user_data.sh")).t
 let userData = mustache.render(userDataTemplate, {
     GITHUB_ACCESS_TOKEN: config.require("GITHUB_ACCESS_TOKEN"),
     GITHUB_ACTIONS_RUNNER_CONTEXT: config.require("GITHUB_ACTIONS_RUNNER_CONTEXT")
-})
+});
 
 let keyName: pulumi.Input<string> | undefined = config.get("keyName");
 if (!keyName) {
@@ -167,7 +167,7 @@ const launchTemplate = new aws.ec2.LaunchTemplate("ci-cd-runner-template", {
 });
 
 // create a sns topic to receive ASG lifecycle events
-const asgEventsTopic = new aws.sns.Topic("asg-events-topic")
+const asgEventsTopic = new aws.sns.Topic("asg-events-topic");
 
 // create an ASG for ec2 instances running github runners, terminating events
 // are posted to a SNS Q with topic asg-events-topic
@@ -192,9 +192,38 @@ const runnerAsg = new aws.autoscaling.Group("ci-cd-runner-asg", {
     }]
 });
 
-const tvs = asgEventsTopic.onEvent("ci-cd-scale-in", async ev =>{
-    console.log("Processing " + JSON.stringify(ev));
-})
+asgEventsTopic.onEvent("ci-cd-scale-in", async ev => {
+    const aws = require("aws-sdk")
+    const ssm = new aws.SSM();
+    const autoscaling = new aws.AutoScaling();
+    var msg = JSON.parse(ev.Records[0].Sns.Message);
+    const lifecycleActionToken = msg.LifecycleActionToken;
+    const asgName = msg.AutoScalingGroupName;
+    const lifecycleHookName = msg.LifecycleHookName;
+    const ec2InstanceId = msg.EC2InstanceId;
+
+    const params = {
+        DocumentName: "AWS-RunShellScript",
+        InstanceIds: [ec2InstanceId],
+        Parameters: {
+            commands: ["./instance_terminating.sh"],
+            workingDirectory: ["/home/runner"]
+        },
+        TimeoutSeconds: 600
+    }
+    
+    const response = await ssm.sendCommand(params);
+    console.log(JSON.stringify(response))
+    if (response.err) console.log(response.err, response.err.stack);
+    else console.log(response.data); 
+
+    return autoscaling.completeLifecycleAction({
+        AutoScalingGroupName: asgName, 
+        LifecycleActionResult: "CONTINUE", 
+        LifecycleActionToken: lifecycleActionToken, 
+        LifecycleHookName: lifecycleHookName
+    });
+});
 
 
 // create a bastion hosts in the public subnet
@@ -211,4 +240,4 @@ export const bastionHost = vpc.publicSubnetIds.then(psnids => {
         },
         keyName: keyName
     })
-})
+});
