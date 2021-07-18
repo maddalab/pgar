@@ -91,7 +91,7 @@ REMOVE_TOKEN="\$(curl -XPOST -fsSL \
 RUNNER_ALLOW_RUNASROOT=1 ./svc.sh uninstall
 
 # remove the runner
-RUNNER_ALLOW_RUNASROOT=1 ./config.sh remove \${REMOVE_TOKEN}
+RUNNER_ALLOW_RUNASROOT=1 ./config.sh remove --token \${REMOVE_TOKEN}
 EOF
 
 chmod +x /home/runner/instance_terminating.sh
