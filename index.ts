@@ -5,11 +5,6 @@ import * as fs from 'fs';
 import * as mustache from "mustache";
 import * as path from "path";
 
-// create a log bucket
-let cicdBucket = new aws.s3.Bucket("ci-cd-lambda-logs", {
-    bucketPrefix: "ci-cd-lambda-logs"
-})
-
 // Define a new VPC
 const vpc = new awsx.ec2.Vpc("ci-cd", {
     numberOfAvailabilityZones: 2,
@@ -19,9 +14,6 @@ const vpc = new awsx.ec2.Vpc("ci-cd", {
         {type: "private", tags: {Name: "ci-cd-private"}},
         {type: "public", tags: {Name: "ci-cd-public"}}
     ],
-    tags: {
-        Name: "ci-cd"
-    }
 });
 
 // create an IAM role for github runners (using ec2 service principal) 
@@ -182,10 +174,6 @@ const launchTemplate = new aws.ec2.LaunchTemplate("ci-cd-runner-template", {
     imageId: ami.id,
     instanceType: "t2.large",
     keyName: keyName,
-    name: "ci-cd-runner-template",
-    tags: {
-        Name: "ci-cd-runner-template",
-    },
     iamInstanceProfile: {
         arn: runnerProfile.arn
     },
@@ -199,7 +187,6 @@ const asgEventsTopic = new aws.sns.Topic("asg-events-topic");
 // create an ASG for ec2 instances running github runners, terminating events
 // are posted to a SNS with topic asg-events-topic
 const runnerAsg = new aws.autoscaling.Group("ci-cd-runner-asg", {
-    name: "ci-cd-runner-asg",
     desiredCapacity: 2,
     maxSize: 2,
     minSize: 1,
@@ -240,9 +227,7 @@ const cb = new aws.lambda.CallbackFunction("ci-cd-scale-in-callback", {
                 'commands': ["./instance_terminating.sh"],
                 'workingDirectory': ["/home/runner"]
             },
-            'TimeoutSeconds': 600,
-            'OutputS3BucketName' : cicdBucket.bucket,
-            'OutputS3KeyPrefix' : 'runner-termination'
+            'TimeoutSeconds': 600
         }
 
         console.log("Running shell script with " + JSON.stringify(params));
@@ -275,9 +260,6 @@ export const bastionHost = vpc.publicSubnetIds.then(psnids => {
         vpcSecurityGroupIds: [ instanceSecurityGroups.id ], 
         ami: ami.id,
         subnetId: firstSubnetId,
-        tags: {
-            Name: "ci-cd-ssh-host"
-        },
         keyName: keyName
     })
 });
