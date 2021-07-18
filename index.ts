@@ -5,6 +5,11 @@ import * as fs from 'fs';
 import * as mustache from "mustache";
 import * as path from "path";
 
+// create a log bucket
+let cicdBucket = new aws.s3.Bucket("ci-cd-lambda-logs", {
+    bucketPrefix: "ci-cd-lambda-logs"
+})
+
 // Define a new VPC
 const vpc = new awsx.ec2.Vpc("ci-cd", {
     numberOfAvailabilityZones: 2,
@@ -235,7 +240,9 @@ const cb = new aws.lambda.CallbackFunction("ci-cd-scale-in-callback", {
                 'commands': ["./instance_terminating.sh"],
                 'workingDirectory': ["/home/runner"]
             },
-            'TimeoutSeconds': 600
+            'TimeoutSeconds': 600,
+            'OutputS3BucketName' : cicdBucket.bucket,
+            'OutputS3KeyPrefix' : 'runner-termination'
         }
 
         console.log("Running shell script with " + JSON.stringify(params));
