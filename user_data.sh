@@ -25,6 +25,9 @@ curl -sSLO https://github.com/actions/runner/releases/download/v${GITHUB_RUNNER_
 tar -zxvf actions-runner-linux-x64-${GITHUB_RUNNER_VERSION}.tar.gz
 rm -f actions-runner-linux-x64-${GITHUB_RUNNER_VERSION}.tar.gz
 
+# retrieve the instance id
+INSTANCE_ID=$(curl http://169.254.169.254/latest/meta-data/instance-id)
+
 # invoke install dependencies in the runner
 ./bin/installdependencies.sh
 
@@ -50,7 +53,7 @@ RUNNER_TOKEN="$(curl -XPOST -fsSL \
 "${TOKEN_REGISTRATION_URL}" \
 | jq -r '.token')"
 
-RUNNER_ALLOW_RUNASROOT=1 ./config.sh --url "${GITHUB_ACTIONS_RUNNER_CONTEXT}" --token "${RUNNER_TOKEN}" --name "${RUNNER_NAME}" --work "${RUNNER_WORKDIR}" --labels "self-hosted,x64,linux"
+RUNNER_ALLOW_RUNASROOT=1 ./config.sh --url "${GITHUB_ACTIONS_RUNNER_CONTEXT}" --token "${RUNNER_TOKEN}" --name "${RUNNER_NAME}" --work "${RUNNER_WORKDIR}" --labels "${INSTANCE_ID},self-hosted,x64,linux"
 chown -R runner:runner /home/runner
 chmod -R 0777 /home/runner
 RUNNER_ALLOW_RUNASROOT=1 ./svc.sh install
