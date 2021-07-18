@@ -26,12 +26,6 @@ const cicdRole = new aws.iam.Role("ci-cd-role", {
     }),
 });
 
-const bastionRole = new aws.iam.Role("ci-cd-bastion-role", {
-    assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
-        Service: "ec2.amazonaws.com",
-    }),
-});
-
 // policies provided to the github runner
 const runnerPolicies: [string, string][] = [
     ['AdministratorAccess', 'arn:aws:iam::aws:policy/AdministratorAccess']
@@ -52,9 +46,16 @@ const runnerProfile = new aws.iam.InstanceProfile('ci-cd-runner', {
     role: cicdRole.name
 });
 
+// create an IAM role for bastion hosts (using ec2 service principal) 
 const bastionHostPolicies: [string, string][] = [
     ['ReadOnlyAccess', 'arn:aws:iam::aws:policy/ReadOnlyAccess']
 ];
+
+const bastionRole = new aws.iam.Role("ci-cd-bastion-role", {
+    assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
+        Service: "ec2.amazonaws.com",
+    }),
+});
 
 for (const policy of bastionHostPolicies) {
     // Create RolePolicyAttachment without returning it.
@@ -67,6 +68,7 @@ const bastionHostProfile = new aws.iam.InstanceProfile('ci-cd-bastion-host', {
     role: bastionRole.name
 });
 
+// create an IAM role for receiving life cycle events from the asg
 const lifecycleRole = new aws.iam.Role("ci-cd-lifecycle-role", {
     assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
         Service: "autoscaling.amazonaws.com",
@@ -81,6 +83,26 @@ for (const policy of lifecyclePolicies) {
     // Create RolePolicyAttachment without returning it.
     const rpa = new aws.iam.RolePolicyAttachment(`ci-cd-lifecycle-${policy[0]}`,
         { policyArn: policy[1], role: lifecycleRole.id }, { parent: lifecycleRole }
+    );
+}
+
+// create an iam role for lambda executoon
+const lambdaRole = new aws.iam.Role("ci-cd-scale-in", {
+    assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
+        Service: "lambda.amazonaws.com",
+    }),
+});
+
+const lambdaPolicies: [string, string][] = [
+    ['AWSLambdaBasicExecutionRole', 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'],
+    ['AmazonSSMFullAccess', 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'],
+    ['AutoScalingFullAccess', 'arn:aws:iam::aws:policy/AutoScalingFullAccess'],
+];
+
+for (const policy of lambdaPolicies) {
+    // Create RolePolicyAttachment without returning it.
+    const rpa = new aws.iam.RolePolicyAttachment(`ci-cd-scale-in-${policy[0]}`,
+        { policyArn: policy[1], role: lambdaRole.id }, { parent: lambdaRole }
     );
 }
 
@@ -170,7 +192,7 @@ const launchTemplate = new aws.ec2.LaunchTemplate("ci-cd-runner-template", {
 const asgEventsTopic = new aws.sns.Topic("asg-events-topic");
 
 // create an ASG for ec2 instances running github runners, terminating events
-// are posted to a SNS Q with topic asg-events-topic
+// are posted to a SNS with topic asg-events-topic
 const runnerAsg = new aws.autoscaling.Group("ci-cd-runner-asg", {
     name: "ci-cd-runner-asg",
     desiredCapacity: 2,
@@ -192,38 +214,49 @@ const runnerAsg = new aws.autoscaling.Group("ci-cd-runner-asg", {
     }]
 });
 
-asgEventsTopic.onEvent("ci-cd-scale-in", async ev => {
-    const aws = require("aws-sdk")
-    const ssm = new aws.SSM();
-    const autoscaling = new aws.AutoScaling();
-    var msg = JSON.parse(ev.Records[0].Sns.Message);
-    const lifecycleActionToken = msg.LifecycleActionToken;
-    const asgName = msg.AutoScalingGroupName;
-    const lifecycleHookName = msg.LifecycleHookName;
-    const ec2InstanceId = msg.EC2InstanceId;
+const cb = new aws.lambda.CallbackFunction("ci-cd-scale-in-callback", {
+    role: lambdaRole,
+    callback: async (ev: any) => {
+        console.log(JSON.stringify(ev));
 
-    const params = {
-        DocumentName: "AWS-RunShellScript",
-        InstanceIds: [ec2InstanceId],
-        Parameters: {
-            commands: ["./instance_terminating.sh"],
-            workingDirectory: ["/home/runner"]
-        },
-        TimeoutSeconds: 600
-    }
+        const aws = require("aws-sdk")
+        const ssm = new aws.SSM();
+        const autoscaling = new aws.AutoScaling();
+        var msg = JSON.parse(ev.Records[0].Sns.Message);
+        const lifecycleActionToken = msg.LifecycleActionToken;
+        const asgName = msg.AutoScalingGroupName;
+        const lifecycleHookName = msg.LifecycleHookName;
+        const ec2InstanceId = msg.EC2InstanceId;
     
-    const response = await ssm.sendCommand(params);
-    console.log(JSON.stringify(response))
-    if (response.err) console.log(response.err, response.err.stack);
-    else console.log(response.data); 
+        const params = {
+            'DocumentName': "AWS-RunShellScript",
+            'InstanceIds': [ec2InstanceId],
+            'Parameters': {
+                'commands': ["./instance_terminating.sh"],
+                'workingDirectory': ["/home/runner"]
+            },
+            'TimeoutSeconds': 600
+        }
 
-    return autoscaling.completeLifecycleAction({
-        AutoScalingGroupName: asgName, 
-        LifecycleActionResult: "CONTINUE", 
-        LifecycleActionToken: lifecycleActionToken, 
-        LifecycleHookName: lifecycleHookName
-    });
+        console.log("Running shell script with " + JSON.stringify(params));
+        const scr = ssm.sendCommand(params, function(err: any, data: any) {
+            if (err) console.log(err, err.stack);
+            else console.log("Proceeding to completeLifecycleAction " + JSON.stringify(data));
+        }).promise();
+
+        return scr.then(function (result: any) {
+            console.log("Completing life cycle " + JSON.stringify(result));
+            return autoscaling.completeLifecycleAction({
+                'AutoScalingGroupName': asgName,
+                'LifecycleActionResult': "CONTINUE",
+                'LifecycleActionToken': lifecycleActionToken,
+                'LifecycleHookName': lifecycleHookName
+            }).promise();
+        });
+    }
 });
+
+asgEventsTopic.onEvent("ci-cd-scale-in", cb);
 
 
 // create a bastion hosts in the public subnet
