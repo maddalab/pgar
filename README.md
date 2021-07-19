@@ -7,7 +7,7 @@ NOTE: This code needs to be bootstrapped from a developer machine with privilege
 
 ### Log into Pulumi service
 ```
-pulumi logic
+pulumi login
 ```
 
 ### Select the organization and stack
@@ -33,14 +33,15 @@ pulumi destroy
 
 * Creates a VPC in 2 AZs
 * Each AZ has a private and public subnet
-* Each private subnet is configured with an instance of Github Runner
-* Each public subnet is configured with a host for use with SSH
+* Each private subnet is configured with an instance of Github Runner for availability
+* Public subnets are unused
 * NAT gateway is created in private subnet to route traffic from `Github Runner`
 * Internet gateway is created in public subnet to route traffic to the internet
 * An autoscaling group is utilized to ensure that there are at least 2 runners at any time.
 * A lifecycle hook is associated with the instance in the auto scaling group
-* A lambda is invoked to deregister / remove the runner when the EC2 instance in the auto scaling group is terminated (**IN-PROGRESS**)
+* A lambda is invoked to deregister / remove the runner when the EC2 instance in the auto scaling group is terminated
 * User Data script is utilized to register EC2 instance as a runner.
+* A shell script is used to deregister EC2 instance. The script is invoked by the lambda.
 
 
 # Configurations
@@ -71,12 +72,11 @@ pulumi config set GITHUB_ACTIONS_RUNNER_CONTEXT https://github.com/ooorganizatio
 
 # TODO
 
-* Currently this utilized a PAT (_personal account token associated with @maddalab's account_) Replace it with a Organizational app token.
-* Complete lambda implementation to handle lifecycle of EC2 instance,
+* Currently this utilizes a PAT (_personal account token associated with @maddalab's account_) Replace it with a Organizational app token.
 
 # How to use
 
-The intent of this repository is to both develop a pulumi solution for `Github Runner` and to dog food it for development as CI/CD. However by default the runners are shut down and not in use. To utilize the runners, follow the steps as below
+The intent of this repository is to both develop a pulumi solution for `Github Runner` and to dog food it for development as CI/CD. However by default the runners are shut down and not in use (it costs me money). To utilize the runners, follow the steps as below
 
 ```
 # if you have multiple AWS profiles in your `credentials` file.
