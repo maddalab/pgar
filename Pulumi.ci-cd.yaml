@@ -1,7 +1,0 @@
-config:
-  aws:region: us-east-1
-  aws:skipMetadataApiCheck: "false"
-  p-gar:GITHUB_ACCESS_TOKEN:
-    secure: AAABAP3tcaMRZfYWmqzek65uCCXwLkCw1ouRhVolOcyITKMMYrtLKvWcgu1jke2ErMnYosshJ156+1q0Qay/UT04PcbSEMrI
-  p-gar:GITHUB_ACTIONS_RUNNER_CONTEXT: https://github.com/accrue-money
-  p-gar:keyName: ci-cd
