@@ -12,7 +12,7 @@ pulumi logic
 
 ### Select the organization and stack
 ```
-pulumi stack select accrue-money/p-gar/ci-cd
+pulumi stack select maddalab/p-gar/ci-cd
 ```
 
 _Make sure you are invited to the organization_
@@ -45,7 +45,7 @@ pulumi destroy
 
 # Configurations
 
-These are preconfigured for the stack `accrue-money/p-gar/ci-cd` do this only if you are launching a new stack.
+These are preconfigured for the stack `maddalab/p-gar/ci-cd` do this only if you are launching a new stack.
 
 Configure pulumi with values for `aws:region`, `GITHUB_ACCESS_TOKEN`, `GITHUB_ACTIONS_RUNNER_CONTEXT` `keyName`.
 
@@ -55,7 +55,7 @@ Configure pulumi with values for `aws:region`, `GITHUB_ACCESS_TOKEN`, `GITHUB_AC
 pulumi config set --secret GITHUB_ACCESS_TOKEN XXXX
 ```
 
-`GITHUB_ACTIONS_RUNNER_CONTEXT` can be specified in two formats. One for user/repository for instance `https://github.com/maddalab/pulumi-poetry-actions/` or alternatively for organizations for instance `https://github.com/accrue-money`
+`GITHUB_ACTIONS_RUNNER_CONTEXT` can be specified in two formats. One for user/repository for instance `https://github.com/maddalab/pulumi-poetry-actions/` or alternatively for organizations for instance `https://github.com/ooorganizationnn`
 
 Github runners for a single repository
 
@@ -66,7 +66,7 @@ pulumi config set GITHUB_ACTIONS_RUNNER_CONTEXT https://github.com/maddalab/pulu
 Github Runners for entire organization
 
 ```
-pulumi config set GITHUB_ACTIONS_RUNNER_CONTEXT https://github.com/accrue-money
+pulumi config set GITHUB_ACTIONS_RUNNER_CONTEXT https://github.com/ooorganizationnnn
 ```
 
 # TODO

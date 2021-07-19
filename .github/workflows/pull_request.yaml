@@ -30,7 +30,7 @@ jobs:
               uses: pulumi/actions@v3
               with:
                   command: preview
-                  stack-name: accrue-money/ci-cd
+                  stack-name: maddalab/ci-cd
               env:
                   PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
 
