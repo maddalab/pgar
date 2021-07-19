@@ -16,92 +16,36 @@ const vpc = new awsx.ec2.Vpc("ci-cd", {
     ],
 });
 
+
 // create an IAM role for github runners (using ec2 service principal) 
-const cicdRole = new aws.iam.Role("ci-cd-role", {
-    assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
-        Service: "ec2.amazonaws.com",
-    }),
-});
-
-// policies provided to the github runner
-const runnerPolicies: [string, string][] = [
+const cicdRole = createRole("ci-cd", "ec2.amazonaws.com", [
     ['AdministratorAccess', 'arn:aws:iam::aws:policy/AdministratorAccess']
-];
-
-/*
-  Loop through the managed policies and attach
-  them to the defined IAM role
-*/
-for (const policy of runnerPolicies) {
-    // Create RolePolicyAttachment without returning it.
-    const rpa = new aws.iam.RolePolicyAttachment(`ci-cd-${policy[0]}`,
-        { policyArn: policy[1], role: cicdRole.id }, { parent: cicdRole }
-    );
-}
+]);
 
 const runnerProfile = new aws.iam.InstanceProfile('ci-cd-runner', {
     role: cicdRole.name
 });
 
 // create an IAM role for bastion hosts (using ec2 service principal) 
-const bastionHostPolicies: [string, string][] = [
+const bastionRole = createRole("ci-cd-bastion", "ec2.amazonaws.com", [
     ['ReadOnlyAccess', 'arn:aws:iam::aws:policy/ReadOnlyAccess']
-];
-
-const bastionRole = new aws.iam.Role("ci-cd-bastion-role", {
-    assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
-        Service: "ec2.amazonaws.com",
-    }),
-});
-
-for (const policy of bastionHostPolicies) {
-    // Create RolePolicyAttachment without returning it.
-    const rpa = new aws.iam.RolePolicyAttachment(`ci-cd-bastion-${policy[0]}`,
-        { policyArn: policy[1], role: bastionRole.id }, { parent: bastionRole }
-    );
-}
+]);
 
 const bastionHostProfile = new aws.iam.InstanceProfile('ci-cd-bastion-host', {
     role: bastionRole.name
 });
 
 // create an IAM role for receiving life cycle events from the asg
-const lifecycleRole = new aws.iam.Role("ci-cd-lifecycle-role", {
-    assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
-        Service: "autoscaling.amazonaws.com",
-    }),
-});
-
-const lifecyclePolicies: [string, string][] = [
+const lifecycleRole = createRole("ci-cd-lifecycle", "autoscaling.amazonaws.com", [
     ['AutoScalingNotificationAccessRole', 'arn:aws:iam::aws:policy/service-role/AutoScalingNotificationAccessRole'],
-];
-
-for (const policy of lifecyclePolicies) {
-    // Create RolePolicyAttachment without returning it.
-    const rpa = new aws.iam.RolePolicyAttachment(`ci-cd-lifecycle-${policy[0]}`,
-        { policyArn: policy[1], role: lifecycleRole.id }, { parent: lifecycleRole }
-    );
-}
+]);
 
 // create an iam role for lambda executoon
-const lambdaRole = new aws.iam.Role("ci-cd-scale-in", {
-    assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
-        Service: "lambda.amazonaws.com",
-    }),
-});
-
-const lambdaPolicies: [string, string][] = [
+const lambdaRole = createRole("ci-cd-scale-in", "lambda.amazonaws.com", [
     ['AWSLambdaBasicExecutionRole', 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'],
     ['AmazonSSMFullAccess', 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'],
     ['AutoScalingFullAccess', 'arn:aws:iam::aws:policy/AutoScalingFullAccess'],
-];
-
-for (const policy of lambdaPolicies) {
-    // Create RolePolicyAttachment without returning it.
-    const rpa = new aws.iam.RolePolicyAttachment(`ci-cd-scale-in-${policy[0]}`,
-        { policyArn: policy[1], role: lambdaRole.id }, { parent: lambdaRole }
-    );
-}
+]);
 
 /*
   This grabs the AMI asynchronously so we can use it to pass to the launchtemplate etc
@@ -115,11 +59,10 @@ const ami = pulumi.output(aws.ec2.getAmi({
     mostRecent: true
 }));
 
-/*
-  Define a security group for the ec2 instances.
-  We allow egress all, and we also allow access to all ports from within the VPC subnet
-  We notably don't allow SSH access, because we use AWS SSM for that instead
-*/
+// Define a security group for the ec2 instances.
+// We allow egress all, and we also allow access to all ports from within the VPC subnet
+// We notably don't allow SSH access, because we use AWS SSM for that instead.
+// Check out SSM Run Commands and console as an alternative to accomplishing tasks
 const instanceSecurityGroups = new aws.ec2.SecurityGroup('ci-cd-instance-securitygroup', {
     vpcId: vpc.id,
     description: "Allow all ports from same subnet",
@@ -128,21 +71,6 @@ const instanceSecurityGroups = new aws.ec2.SecurityGroup('ci-cd-instance-securit
         fromPort: 0,
         toPort: 0,
         cidrBlocks: [ "10.0.0.0/26"]
-    },{
-        protocol: "tcp",
-        fromPort: 22,
-        toPort: 22,
-        cidrBlocks: ["0.0.0.0/0"]
-    },{
-        protocol: "tcp",
-        fromPort: 80,
-        toPort: 80,
-        cidrBlocks: ["0.0.0.0/0"]
-    }, { 
-        protocol: "tcp", 
-        fromPort: 443, 
-        toPort: 443, 
-        cidrBlocks: ["0.0.0.0/0"]
     }],
     egress: [{
         protocol: '-1',
@@ -152,10 +80,9 @@ const instanceSecurityGroups = new aws.ec2.SecurityGroup('ci-cd-instance-securit
     }]
 });
 
-/*
-  This defines the userdata for the instances on startup.
-  We read the file async, and then convert to a Base64 string because it's clean in the metadata
-*/
+// This defines the userdata for the instances on startup.
+// We read the file async, and then convert to a Base64 string
+// mustache templating used to pass in information available in pulumi
 const config = new pulumi.Config();
 const userDataTemplate = fs.readFileSync(path.join(__dirname, "user_data.sh")).toString();
 let userData = mustache.render(userDataTemplate, {
@@ -163,6 +90,10 @@ let userData = mustache.render(userDataTemplate, {
     GITHUB_ACTIONS_RUNNER_CONTEXT: config.require("GITHUB_ACTIONS_RUNNER_CONTEXT")
 });
 
+// A key pair is manually set up and referenced here via keyname. key pair
+// is used for ec2 instance. It is not necessary to set one up using the 
+// console. Provide public key material via ssh-key property to create a new
+// key association in aws
 let keyName: pulumi.Input<string> | undefined = config.get("keyName");
 if (!keyName) {
     const key = new aws.ec2.KeyPair("ci-cd", { keyName: "ci-cd", publicKey: config.require("ssh-key")})
@@ -172,7 +103,7 @@ if (!keyName) {
 const launchTemplate = new aws.ec2.LaunchTemplate("ci-cd-runner-template", {
     description: "Github Actions Runner template",
     imageId: ami.id,
-    instanceType: "t2.large",
+    instanceType: "t2.large", // TODO: convert to config
     keyName: keyName,
     iamInstanceProfile: {
         arn: runnerProfile.arn
@@ -185,7 +116,8 @@ const launchTemplate = new aws.ec2.LaunchTemplate("ci-cd-runner-template", {
 const asgEventsTopic = new aws.sns.Topic("asg-events-topic");
 
 // create an ASG for ec2 instances running github runners, terminating events
-// are posted to a SNS with topic asg-events-topic
+// are posted to a SNS with topic asg-events-topic. ASG is manually configured
+// for now TODO: Determine CW even criteria to scale.
 const runnerAsg = new aws.autoscaling.Group("ci-cd-runner-asg", {
     desiredCapacity: 2,
     maxSize: 2,
@@ -206,6 +138,8 @@ const runnerAsg = new aws.autoscaling.Group("ci-cd-runner-asg", {
     }]
 });
 
+// lambda function than listens to ASG events and ensures EC2 instance
+// cleanly unregister themselves in github before terminating
 const cb = new aws.lambda.CallbackFunction("ci-cd-scale-in-callback", {
     role: lambdaRole,
     callback: async (ev: any) => {
@@ -250,16 +184,24 @@ const cb = new aws.lambda.CallbackFunction("ci-cd-scale-in-callback", {
 
 asgEventsTopic.onEvent("ci-cd-scale-in", cb);
 
+function createRole(rolePrefix: string, servicePrincipal: string, policies: [string, string][]) {
 
-// create a bastion hosts in the public subnet
-export const bastionHost = vpc.publicSubnetIds.then(psnids => {
-    const firstSubnetId = psnids[0]
-    return new aws.ec2.Instance("ci-cd-ssh-host", {
-        iamInstanceProfile: bastionHostProfile,
-        instanceType: "t2.large",
-        vpcSecurityGroupIds: [ instanceSecurityGroups.id ], 
-        ami: ami.id,
-        subnetId: firstSubnetId,
-        keyName: keyName
-    })
-});
+    const role = new aws.iam.Role(`${rolePrefix}-role`, {
+        assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
+            Service: servicePrincipal,
+        }),
+    });
+
+    /*
+      Loop through the managed policies and attach
+      them to the defined IAM role
+    */
+    for (const policy of policies) {
+        // Create RolePolicyAttachment without returning it.
+        const rpa = new aws.iam.RolePolicyAttachment(`${rolePrefix}-${policy[0]}`,
+            { policyArn: policy[1], role: role.id }, { parent: role }
+        );
+    }
+    return role;
+}
+
